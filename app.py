@@ -1,9 +1,6 @@
 import io
 import math
 
-import cv2
-import mediapipe as mp
-import numpy as np
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -19,7 +16,6 @@ app.add_middleware(
 
 MAX_SIZE = 8 * 1024 * 1024
 ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp"}
-face_mesh = mp.solutions.face_mesh
 
 @app.get("/")
 async def home():
@@ -33,6 +29,19 @@ def distance(a, b):
     return math.dist(a, b)
 
 def analyze_landmarks(image_bytes):
+    # Load the computer-vision stack only when an image is analyzed.
+    # This lets the web server bind its port without waiting for MediaPipe startup.
+    try:
+        import cv2
+        import mediapipe as mp
+        import numpy as np
+        face_mesh = mp.solutions.face_mesh
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Модуль анализа временно недоступен: {type(exc).__name__}: {exc}",
+        )
+
     array = np.frombuffer(image_bytes, dtype=np.uint8)
     image = cv2.imdecode(array, cv2.IMREAD_COLOR)
     if image is None:
