@@ -162,9 +162,14 @@ document.getElementById("upload").onchange=async (event)=>{
   if(!response.ok) {
    throw new Error(result.detail || "Upload failed");
   }
-  alert(language==="ru"
-   ? "Фотография успешно отправлена!\\n\\n"+(result.message || "Сервер получил фото.")
-   : "Photo uploaded successfully!\\n\\n"+(result.message || "Server received the photo."));
+  let report = "";
+  if(result.measurements){
+   const m=result.measurements;
+   report = language==="ru"
+    ? "\\n\\nПредварительные измерения:\\nОтношение ширины лица к высоте: "+m.face_width_height_ratio+"\\nМежзрачковое расстояние / ширина лица: "+m.eye_distance_face_width_ratio+"\\nШирина глазной линии / ширина лица: "+m.eye_span_face_width_ratio+"\\nШирина рта / ширина лица: "+m.mouth_width_face_width_ratio+"\\nОтклонение ориентиров симметрии: "+m.left_right_landmark_deviation+"\\n\\nЭто геометрические показатели, не оценка привлекательности."
+    : "\\n\\nPreliminary measurements:\\nFace width/height: "+m.face_width_height_ratio+"\\nInner eye distance/face width: "+m.eye_distance_face_width_ratio+"\\nOuter eye span/face width: "+m.eye_span_face_width_ratio+"\\nMouth width/face width: "+m.mouth_width_face_width_ratio+"\\nLandmark symmetry deviation: "+m.left_right_landmark_deviation+"\\n\\nThese are geometric measurements, not an attractiveness score.";
+  }
+  alert((language==="ru"?"Фотография успешно обработана!\\n\\n":"Photo processed successfully!\\n\\n")+(result.message || "")+report);
  } catch(error) {
   alert(language==="ru"
    ? "Ошибка отправки: "+error.message
