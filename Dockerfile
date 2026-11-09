@@ -21,6 +21,7 @@ WORKDIR /app
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && pip install --no-cache-dir -r requirements.txt
+RUN ldconfig -p | grep -F 'libGLESv2.so.2' && python -c "import mediapipe as mp; print('MediaPipe import OK:', mp.__version__)"
 
 COPY . .
 
