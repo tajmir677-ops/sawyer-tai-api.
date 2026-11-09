@@ -29,46 +29,67 @@ def distance(a, b):
     return math.dist(a, b)
 
 def analyze_landmarks(image_bytes):
-    # Load the computer-vision stack only when an image is analyzed.
-    # This lets the web server bind its port without waiting for MediaPipe startup.
+    # MediaPipe 0.10.30+ no longer ships the legacy mp.solutions API.
+    # Use the supported Tasks FaceLandmarker API and cache its model in /tmp.
     try:
+        import os
+        import urllib.request
         import cv2
         import mediapipe as mp
         import numpy as np
-        face_mesh = mp.solutions.face_mesh
+
+        model_path = "/tmp/face_landmarker.task"
+        if not os.path.exists(model_path) or os.path.getsize(model_path) < 100000:
+            model_url = (
+                "https://storage.googleapis.com/mediapipe-models/"
+                "face_landmarker/face_landmarker/float16/1/face_landmarker.task"
+            )
+            temporary_path = model_path + ".download"
+            with urllib.request.urlopen(model_url, timeout=45) as response:
+                model_data = response.read()
+            if len(model_data) < 100000:
+                raise RuntimeError("Downloaded face model is unexpectedly small")
+            with open(temporary_path, "wb") as model_file:
+                model_file.write(model_data)
+            os.replace(temporary_path, model_path)
+
+        image_array = np.frombuffer(image_bytes, dtype=np.uint8)
+        image_bgr = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
+        if image_bgr is None:
+            raise HTTPException(status_code=400, detail="Не удалось прочитать изображение")
+
+        height, width = image_bgr.shape[:2]
+        if width < 160 or height < 160:
+            raise HTTPException(status_code=400, detail="Изображение слишком маленькое")
+
+        image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
+        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=image_rgb)
+        options = mp.tasks.vision.FaceLandmarkerOptions(
+            base_options=mp.tasks.BaseOptions(model_asset_path=model_path),
+            running_mode=mp.tasks.vision.RunningMode.IMAGE,
+            num_faces=2,
+            min_face_detection_confidence=0.5,
+            min_face_presence_confidence=0.5,
+        )
+        with mp.tasks.vision.FaceLandmarker.create_from_options(options) as detector:
+            result = detector.detect(mp_image)
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(
             status_code=503,
             detail=f"Модуль анализа временно недоступен: {type(exc).__name__}: {exc}",
         )
 
-    array = np.frombuffer(image_bytes, dtype=np.uint8)
-    image = cv2.imdecode(array, cv2.IMREAD_COLOR)
-    if image is None:
-        raise HTTPException(status_code=400, detail="Не удалось прочитать изображение")
-
-    height, width = image.shape[:2]
-    if width < 160 or height < 160:
-        raise HTTPException(status_code=400, detail="Изображение слишком маленькое")
-
-    rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    with face_mesh.FaceMesh(
-        static_image_mode=True,
-        max_num_faces=2,
-        refine_landmarks=True,
-        min_detection_confidence=0.5,
-    ) as detector:
-        result = detector.process(rgb)
-
-    if not result.multi_face_landmarks:
+    if not result.face_landmarks:
         raise HTTPException(status_code=422, detail="Лицо не обнаружено. Используй чёткое фото анфас.")
 
-    if len(result.multi_face_landmarks) > 1:
+    if len(result.face_landmarks) > 1:
         raise HTTPException(status_code=422, detail="На фото найдено несколько лиц. Загрузи фото одного человека.")
 
-    points = [(p.x * width, p.y * height) for p in result.multi_face_landmarks[0].landmark]
+    points = [(p.x * width, p.y * height) for p in result.face_landmarks[0]]
 
-    # MediaPipe Face Mesh landmark indices. Ratios are geometric observations,
+    # Face Landmarker mesh indices. Ratios are geometric observations,
     # not attractiveness scores or medical measurements.
     face_top = points[10]
     chin = points[152]
@@ -91,8 +112,6 @@ def analyze_landmarks(image_bytes):
     if face_height <= 0 or face_width <= 0:
         raise HTTPException(status_code=422, detail="Не удалось определить геометрию лица")
 
-    # Approximate left/right landmark correspondence deviation, normalized
-    # by face width. This is sensitive to pose, expression and image quality.
     pairs = [(33, 263), (133, 362), (159, 386), (61, 291), (234, 454)]
     deviations = []
     center_x = (left_face[0] + right_face[0]) / 2
