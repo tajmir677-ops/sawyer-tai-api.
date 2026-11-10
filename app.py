@@ -95,6 +95,13 @@ def analyze_landmarks(image_bytes):
     chin = points[152]
     left_face = points[234]
     right_face = points[454]
+    # Additional approximate contour landmarks from the Face Mesh.
+    left_jaw = points[172]
+    right_jaw = points[397]
+    left_cheek = points[234]
+    right_cheek = points[454]
+    left_brow = points[105]
+    right_brow = points[334]
     left_eye_outer = points[33]
     right_eye_outer = points[263]
     left_eye_inner = points[133]
@@ -108,6 +115,12 @@ def analyze_landmarks(image_bytes):
     eye_distance = distance(left_eye_inner, right_eye_inner)
     mouth_width = distance(left_mouth, right_mouth)
     eye_span = distance(left_eye_outer, right_eye_outer)
+    jaw_width = distance(left_jaw, right_jaw)
+    cheek_width = distance(left_cheek, right_cheek)
+    brow_span = distance(left_brow, right_brow)
+    eye_line_tilt = abs(left_eye_outer[1] - right_eye_outer[1]) / face_width
+    mouth_line_tilt = abs(left_mouth[1] - right_mouth[1]) / face_width
+    lower_face_height = distance(points[168], chin)
 
     if face_height <= 0 or face_width <= 0:
         raise HTTPException(status_code=422, detail="Не удалось определить геометрию лица")
@@ -132,17 +145,30 @@ def analyze_landmarks(image_bytes):
             "mouth_width_face_width_ratio": round(mouth_width / face_width, 3),
             "nose_tip_face_center_offset": round((nose_tip[0] - center_x) / face_width, 3),
             "left_right_landmark_deviation": round(symmetry_deviation, 3),
+            "jaw_cheek_width_ratio": round(jaw_width / cheek_width, 3) if cheek_width else None,
+            "brow_span_face_width_ratio": round(brow_span / face_width, 3),
+            "eye_line_tilt_ratio": round(eye_line_tilt, 3),
+            "mouth_line_tilt_ratio": round(mouth_line_tilt, 3),
+            "lower_face_face_height_ratio": round(lower_face_height / face_height, 3),
         },
         "categories": {
-            "harmony": "Измерения пропорций получены; интерпретация и валидированная шкала пока не реализованы.",
-            "symmetry": "Получено приблизительное отклонение пар ориентиров; результат зависит от ракурса.",
-            "angularity": "Пока не оценивается: для этого нужна отдельная проверенная методика контура челюсти.",
-            "dimorphism": "Не оценивается: система не делает выводов о поле или гормональных характеристиках по фото.",
-            "features": "Получены базовые геометрические отношения; отдельная оценка глаз, носа, губ и челюсти ещё не реализована.",
+            "harmony": "Измерены общие пропорции лица, положение глаз и нижняя треть. Балл пока не выставляется: нужны проверенные референсные диапазоны.",
+            "symmetry": "Измерено среднее отклонение выбранных пар ориентиров. Это приблизительная 2D-оценка, чувствительная к повороту головы и мимике.",
+            "angularity": "Добавлено отношение ширины нижней челюсти к ширине скул. Оно описывает ширину контура, но само по себе не измеряет углы или выраженность костных структур.",
+            "dimorphism": "Не оценивается по фотографии: система не определяет пол, гормональные характеристики или гендерную идентичность.",
+            "features": "Добавлены геометрические показатели глазной линии, бровей, рта, носа и нижней части лица. Это не оценка привлекательности отдельных черт.",
+        },
+        "category_details": {
+            "harmony": {"status": "measurements_available", "score": None, "score_status": "requires_reference_ranges", "metrics": ["face_width_height_ratio", "eye_distance_face_width_ratio", "eye_span_face_width_ratio", "lower_face_face_height_ratio"]},
+            "symmetry": {"status": "experimental_measurement", "score": None, "score_status": "requires_validation", "metrics": ["left_right_landmark_deviation", "eye_line_tilt_ratio", "mouth_line_tilt_ratio"]},
+            "angularity": {"status": "partial_measurement", "score": None, "score_status": "requires_validated_contour_method", "metrics": ["jaw_cheek_width_ratio"]},
+            "dimorphism": {"status": "not_assessed", "score": None, "score_status": "not_available", "metrics": []},
+            "features": {"status": "descriptive_measurements", "score": None, "score_status": "requires_feature_specific_validation", "metrics": ["eye_distance_face_width_ratio", "eye_span_face_width_ratio", "brow_span_face_width_ratio", "mouth_width_face_width_ratio", "nose_tip_face_center_offset"]}
         },
         "limitations": [
             "Это экспериментальные геометрические измерения, а не оценка привлекательности или здоровья.",
             "Поворот головы, мимика, освещение, объектив и качество фото влияют на результат.",
+            "Оценки по шкале 1–10 пока не выдаются: для них необходимы заранее определённые и проверенные критерии и референсные данные.",
             "Не используй результат для медицинских или иных важных решений.",
         ],
         "message": "Лицо обнаружено. Получены предварительные геометрические измерения."
