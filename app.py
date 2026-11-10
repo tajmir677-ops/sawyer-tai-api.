@@ -89,6 +89,39 @@ def analyze_landmarks(image_bytes):
 
     points = [(p.x * width, p.y * height) for p in result.face_landmarks[0]]
 
+    # Preliminary framing checks only; this is not a validated image-quality score.
+    landmark_x = [p[0] for p in points]
+    landmark_y = [p[1] for p in points]
+    face_left, face_right = min(landmark_x), max(landmark_x)
+    face_top, face_bottom = min(landmark_y), max(landmark_y)
+    face_box_width = face_right - face_left
+    face_box_height = face_bottom - face_top
+    face_width_image_ratio = face_box_width / width
+    face_height_image_ratio = face_box_height / height
+    edge_margin_ratio = min(
+        face_left / width, face_top / height,
+        (width - face_right) / width, (height - face_bottom) / height,
+    )
+    quality_warnings = []
+    if width < 640 or height < 640:
+        quality_warnings.append("Низкое разрешение снимка может снизить точность ориентиров.")
+    if face_width_image_ratio < 0.20:
+        quality_warnings.append("Лицо занимает небольшую часть кадра; лучше загрузить более крупный портрет.")
+    if edge_margin_ratio < 0.02:
+        quality_warnings.append("Лицевая область расположена близко к краю кадра.")
+    photo_quality = {
+        "status": "check_warnings" if quality_warnings else "basic_checks_passed",
+        "image_width": width,
+        "image_height": height,
+        "face_width_image_ratio": round(face_width_image_ratio, 3),
+        "face_height_image_ratio": round(face_height_image_ratio, 3),
+        "minimum_edge_margin_ratio": round(edge_margin_ratio, 3),
+        "warnings": quality_warnings,
+        "not_assessed": ["Размытие и резкость", "Освещение", "Поворот головы и перспектива", "Мимика"],
+        "note": "Предварительные проверки кадрирования; они не подтверждают точность антропометрических измерений."
+    }
+
+
     # Face Landmarker mesh indices. Ratios are geometric observations,
     # not attractiveness scores or medical measurements.
     face_top = points[10]
@@ -138,6 +171,7 @@ def analyze_landmarks(image_bytes):
     return {
         "face_detected": True,
         "face_count": 1,
+        "photo_quality": photo_quality,
         "measurements": {
             "face_width_height_ratio": round(face_width / face_height, 3),
             "eye_distance_face_width_ratio": round(eye_distance / face_width, 3),
