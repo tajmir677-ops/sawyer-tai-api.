@@ -201,14 +201,14 @@ def analyze_landmarks(image_bytes):
             "harmony": "Измерены общие пропорции лица, положение глаз и нижняя треть. Балл пока не выставляется: нужны проверенные референсные диапазоны.",
             "symmetry": "Измерено среднее отклонение выбранных пар ориентиров. Это приблизительная 2D-оценка, чувствительная к повороту головы и мимике.",
             "angularity": "Добавлено отношение ширины нижней челюсти к ширине скул. Оно описывает ширину контура, но само по себе не измеряет углы или выраженность костных структур.",
-            "dimorphism": "Не оценивается по фотографии: система не определяет пол, гормональные характеристики или гендерную идентичность.",
+            "dimorphism": "Экспериментальный индекс видимых геометрических признаков нижней части лица и бровей. Не определяет пол, гормоны или гендерную идентичность.",
             "features": "Добавлены геометрические показатели глазной линии, бровей, рта, носа и нижней части лица. Это не оценка привлекательности отдельных черт.",
         },
         "category_details": {
             "harmony": {"status": "measurements_available", "score": harmony, "score_status": "experimental_heuristic", "metrics": ["face_width_height_ratio", "eye_distance_face_width_ratio", "eye_span_face_width_ratio", "lower_face_face_height_ratio"]},
             "symmetry": {"status": "experimental_measurement", "score": symmetry, "score_status": "experimental_heuristic", "metrics": ["left_right_landmark_deviation", "eye_line_tilt_ratio", "mouth_line_tilt_ratio"]},
             "angularity": {"status": "partial_measurement", "score": angularity, "score_status": "experimental_heuristic", "metrics": ["jaw_cheek_width_ratio"]},
-            "dimorphism": {"status": "not_assessed", "score": dimorphism, "score_status": "experimental_visible_structure_proxy", "metrics": []},
+            "dimorphism": {"status": "experimental_measurement", "score": dimorphism, "score_status": "experimental_visible_structure_proxy", "metrics": []},
             "features": {"status": "descriptive_measurements", "score": features, "score_status": "experimental_heuristic", "metrics": ["eye_distance_face_width_ratio", "eye_span_face_width_ratio", "brow_span_face_width_ratio", "mouth_width_face_width_ratio", "nose_tip_face_center_offset"]}
         },
         "limitations": [
