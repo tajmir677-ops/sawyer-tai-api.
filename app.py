@@ -168,23 +168,35 @@ def analyze_landmarks(image_bytes):
         deviations.append(math.hypot(mirrored_left_x - right[0], left[1] - right[1]) / face_width)
     symmetry_deviation = sum(deviations) / len(deviations)
 
+    # Experimental heuristic scores, not validated attractiveness ratings.
+    def near(value, target, tolerance):
+        return round(max(1.0, min(10.0, 10.0 - 9.0 * abs(value-target)/tolerance)), 1)
+    measurements = {
+        "face_width_height_ratio": round(face_width / face_height, 3),
+        "eye_distance_face_width_ratio": round(eye_distance / face_width, 3),
+        "eye_span_face_width_ratio": round(eye_span / face_width, 3),
+        "mouth_width_face_width_ratio": round(mouth_width / face_width, 3),
+        "nose_tip_face_center_offset": round((nose_tip[0] - center_x) / face_width, 3),
+        "left_right_landmark_deviation": round(symmetry_deviation, 3),
+        "jaw_cheek_width_ratio": round(jaw_width / cheek_width, 3) if cheek_width else None,
+        "brow_span_face_width_ratio": round(brow_span / face_width, 3),
+        "eye_line_tilt_ratio": round(eye_line_tilt, 3),
+        "mouth_line_tilt_ratio": round(mouth_line_tilt, 3),
+        "lower_face_face_height_ratio": round(lower_face_height / face_height, 3),
+    }
+    harmony = round(sum([near(measurements["face_width_height_ratio"],.78,.25), near(measurements["eye_distance_face_width_ratio"],.25,.10), near(measurements["lower_face_face_height_ratio"],.68,.25), near(measurements["mouth_width_face_width_ratio"],.38,.20)])/4,1)
+    symmetry = round(max(1,min(10,near(symmetry_deviation,.015,.10)-min(3,(eye_line_tilt+mouth_line_tilt)*10))),1)
+    angularity = near(measurements["jaw_cheek_width_ratio"] or 0,.82,.30)
+    dimorphism = round(sum([near(measurements["jaw_cheek_width_ratio"] or 0,.82,.35),near(measurements["brow_span_face_width_ratio"],.60,.25),near(measurements["lower_face_face_height_ratio"],.70,.30)])/3,1)
+    features = round(sum([near(measurements["eye_span_face_width_ratio"],.63,.20),near(measurements["mouth_width_face_width_ratio"],.38,.20),near(abs(measurements["nose_tip_face_center_offset"]),0,.15),near(measurements["brow_span_face_width_ratio"],.60,.25)])/4,1)
+    scores = {"harmony":harmony,"symmetry":symmetry,"angularity":angularity,"dimorphism":dimorphism,"features":features}
+    experimental_scores = {"status":"experimental_heuristic","version":"0.2.0","overall":round(sum(scores.values())/5,1),"categories":scores,"warning":"Экспериментальные эвристические индексы, не валидированная шкала привлекательности. Ракурс, мимика, свет и ошибки ориентиров влияют на результат."}
     return {
         "face_detected": True,
         "face_count": 1,
         "photo_quality": photo_quality,
-        "measurements": {
-            "face_width_height_ratio": round(face_width / face_height, 3),
-            "eye_distance_face_width_ratio": round(eye_distance / face_width, 3),
-            "eye_span_face_width_ratio": round(eye_span / face_width, 3),
-            "mouth_width_face_width_ratio": round(mouth_width / face_width, 3),
-            "nose_tip_face_center_offset": round((nose_tip[0] - center_x) / face_width, 3),
-            "left_right_landmark_deviation": round(symmetry_deviation, 3),
-            "jaw_cheek_width_ratio": round(jaw_width / cheek_width, 3) if cheek_width else None,
-            "brow_span_face_width_ratio": round(brow_span / face_width, 3),
-            "eye_line_tilt_ratio": round(eye_line_tilt, 3),
-            "mouth_line_tilt_ratio": round(mouth_line_tilt, 3),
-            "lower_face_face_height_ratio": round(lower_face_height / face_height, 3),
-        },
+        "measurements": measurements,
+        "experimental_scores": experimental_scores,
         "categories": {
             "harmony": "Измерены общие пропорции лица, положение глаз и нижняя треть. Балл пока не выставляется: нужны проверенные референсные диапазоны.",
             "symmetry": "Измерено среднее отклонение выбранных пар ориентиров. Это приблизительная 2D-оценка, чувствительная к повороту головы и мимике.",
@@ -193,19 +205,19 @@ def analyze_landmarks(image_bytes):
             "features": "Добавлены геометрические показатели глазной линии, бровей, рта, носа и нижней части лица. Это не оценка привлекательности отдельных черт.",
         },
         "category_details": {
-            "harmony": {"status": "measurements_available", "score": None, "score_status": "requires_reference_ranges", "metrics": ["face_width_height_ratio", "eye_distance_face_width_ratio", "eye_span_face_width_ratio", "lower_face_face_height_ratio"]},
-            "symmetry": {"status": "experimental_measurement", "score": None, "score_status": "requires_validation", "metrics": ["left_right_landmark_deviation", "eye_line_tilt_ratio", "mouth_line_tilt_ratio"]},
-            "angularity": {"status": "partial_measurement", "score": None, "score_status": "requires_validated_contour_method", "metrics": ["jaw_cheek_width_ratio"]},
-            "dimorphism": {"status": "not_assessed", "score": None, "score_status": "not_available", "metrics": []},
-            "features": {"status": "descriptive_measurements", "score": None, "score_status": "requires_feature_specific_validation", "metrics": ["eye_distance_face_width_ratio", "eye_span_face_width_ratio", "brow_span_face_width_ratio", "mouth_width_face_width_ratio", "nose_tip_face_center_offset"]}
+            "harmony": {"status": "measurements_available", "score": harmony, "score_status": "experimental_heuristic", "metrics": ["face_width_height_ratio", "eye_distance_face_width_ratio", "eye_span_face_width_ratio", "lower_face_face_height_ratio"]},
+            "symmetry": {"status": "experimental_measurement", "score": symmetry, "score_status": "experimental_heuristic", "metrics": ["left_right_landmark_deviation", "eye_line_tilt_ratio", "mouth_line_tilt_ratio"]},
+            "angularity": {"status": "partial_measurement", "score": angularity, "score_status": "experimental_heuristic", "metrics": ["jaw_cheek_width_ratio"]},
+            "dimorphism": {"status": "not_assessed", "score": dimorphism, "score_status": "experimental_visible_structure_proxy", "metrics": []},
+            "features": {"status": "descriptive_measurements", "score": features, "score_status": "experimental_heuristic", "metrics": ["eye_distance_face_width_ratio", "eye_span_face_width_ratio", "brow_span_face_width_ratio", "mouth_width_face_width_ratio", "nose_tip_face_center_offset"]}
         },
         "limitations": [
             "Это экспериментальные геометрические измерения, а не оценка привлекательности или здоровья.",
             "Поворот головы, мимика, освещение, объектив и качество фото влияют на результат.",
-            "Оценки по шкале 1–10 пока не выдаются: для них необходимы заранее определённые и проверенные критерии и референсные данные.",
+            "Оценки 1–10 — экспериментальные геометрические индексы, не валидированная шкала привлекательности.",
             "Не используй результат для медицинских или иных важных решений.",
         ],
-        "message": "Лицо обнаружено. Получены предварительные геометрические измерения."
+        "message": "Лицо обнаружено. Получены измерения и экспериментальные оценки пяти категорий."
     }
 
 @app.post("/upload")
